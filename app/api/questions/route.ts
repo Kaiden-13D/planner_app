@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
+import { getAuthUserId, unauthorized } from '@/app/lib/auth';
 
 // GET: 질문 로그 목록 조회
 export async function GET(request: NextRequest) {
     try {
+        const userId = await getAuthUserId();
+        if (!userId) return unauthorized();
+
         const { searchParams } = new URL(request.url);
         const unresolved = searchParams.get('unresolved');
 
         const questions = await prisma.questionLog.findMany({
-            where: unresolved === 'true' ? { isResolved: false } : {},
+            where: {
+                userId,
+                ...(unresolved === 'true' && { isResolved: false }),
+            },
             orderBy: { createdAt: 'desc' },
         });
 
@@ -22,14 +29,15 @@ export async function GET(request: NextRequest) {
 // POST: 새 질문 생성
 export async function POST(request: NextRequest) {
     try {
-        const { courseId, textbookId, content } = await request.json();
+        const userId = await getAuthUserId();
+        if (!userId) return unauthorized();
 
-        if (!content) {
-            return NextResponse.json({ error: 'content is required' }, { status: 400 });
-        }
+        const { courseId, textbookId, content } = await request.json();
+        if (!content) return NextResponse.json({ error: 'content is required' }, { status: 400 });
 
         const question = await prisma.questionLog.create({
             data: {
+                userId,
                 courseId: courseId || null,
                 textbookId: textbookId || null,
                 content,
@@ -46,14 +54,14 @@ export async function POST(request: NextRequest) {
 // PATCH: 질문 수정
 export async function PATCH(request: NextRequest) {
     try {
-        const { id, content, isResolved } = await request.json();
+        const userId = await getAuthUserId();
+        if (!userId) return unauthorized();
 
-        if (!id) {
-            return NextResponse.json({ error: 'id is required' }, { status: 400 });
-        }
+        const { id, content, isResolved } = await request.json();
+        if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
         const question = await prisma.questionLog.update({
-            where: { id },
+            where: { id, userId },
             data: {
                 ...(content !== undefined && { content }),
                 ...(isResolved !== undefined && { isResolved }),
@@ -70,14 +78,14 @@ export async function PATCH(request: NextRequest) {
 // DELETE: 질문 삭제
 export async function DELETE(request: NextRequest) {
     try {
+        const userId = await getAuthUserId();
+        if (!userId) return unauthorized();
+
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
+        if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
-        if (!id) {
-            return NextResponse.json({ error: 'id is required' }, { status: 400 });
-        }
-
-        await prisma.questionLog.delete({ where: { id } });
+        await prisma.questionLog.delete({ where: { id, userId } });
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Error deleting question:', error);

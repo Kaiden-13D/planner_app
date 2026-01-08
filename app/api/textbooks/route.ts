@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
+import { getAuthUserId, unauthorized } from '@/app/lib/auth';
 
 // GET: 교재 목록 조회
 export async function GET() {
     try {
+        const userId = await getAuthUserId();
+        if (!userId) return unauthorized();
+
         const textbooks = await prisma.textbook.findMany({
+            where: { userId },
             orderBy: { createdAt: 'desc' },
-            include: {
-                _count: { select: { tasks: true } },
-            },
+            include: { _count: { select: { tasks: true } } },
         });
         return NextResponse.json(textbooks);
     } catch (error) {
@@ -20,16 +23,15 @@ export async function GET() {
 // POST: 새 교재 등록
 export async function POST(request: NextRequest) {
     try {
-        const { name, color } = await request.json();
+        const userId = await getAuthUserId();
+        if (!userId) return unauthorized();
 
-        if (!name) {
-            return NextResponse.json({ error: 'name is required' }, { status: 400 });
-        }
+        const { name, color } = await request.json();
+        if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 });
 
         const textbook = await prisma.textbook.create({
-            data: { name, color },
+            data: { userId, name, color },
         });
-
         return NextResponse.json(textbook, { status: 201 });
     } catch (error) {
         console.error('Error creating textbook:', error);
@@ -40,20 +42,16 @@ export async function POST(request: NextRequest) {
 // PATCH: 교재 수정
 export async function PATCH(request: NextRequest) {
     try {
-        const { id, name, color } = await request.json();
+        const userId = await getAuthUserId();
+        if (!userId) return unauthorized();
 
-        if (!id) {
-            return NextResponse.json({ error: 'id is required' }, { status: 400 });
-        }
+        const { id, name, color } = await request.json();
+        if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
         const textbook = await prisma.textbook.update({
-            where: { id },
-            data: {
-                ...(name !== undefined && { name }),
-                ...(color !== undefined && { color }),
-            },
+            where: { id, userId },
+            data: { ...(name !== undefined && { name }), ...(color !== undefined && { color }) },
         });
-
         return NextResponse.json(textbook);
     } catch (error) {
         console.error('Error updating textbook:', error);
@@ -64,14 +62,14 @@ export async function PATCH(request: NextRequest) {
 // DELETE: 교재 삭제
 export async function DELETE(request: NextRequest) {
     try {
+        const userId = await getAuthUserId();
+        if (!userId) return unauthorized();
+
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
+        if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
-        if (!id) {
-            return NextResponse.json({ error: 'id is required' }, { status: 400 });
-        }
-
-        await prisma.textbook.delete({ where: { id } });
+        await prisma.textbook.delete({ where: { id, userId } });
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Error deleting textbook:', error);

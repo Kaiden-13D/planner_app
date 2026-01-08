@@ -16,35 +16,43 @@ generator client {
 // 강의 (이름만)
 model Course {
   id        String      @id @default(cuid())
-  name      String      // 예: "알고리즘", "미적분학"
-  color     String?     // 구분 색상
+  userId    String      // Supabase Auth User ID
+  name      String
+  color     String?
   tasks     DailyTask[]
   createdAt DateTime    @default(now())
+
+  @@index([userId])
 }
 
 // 교재 (이름만)
 model Textbook {
   id        String      @id @default(cuid())
-  name      String      // 예: "클린 코드", "OSTEP"
-  color     String?     // 구분 색상
+  userId    String      // Supabase Auth User ID
+  name      String
+  color     String?
   tasks     DailyTask[]
   createdAt DateTime    @default(now())
+
+  @@index([userId])
 }
 
 // ========== 일일 Task ==========
 
 model DailyTask {
   id          String    @id @default(cuid())
-  date        DateTime  // 해당 날짜
+  userId      String    // Supabase Auth User ID
+  date        DateTime
   courseId    String?
   course      Course?   @relation(fields: [courseId], references: [id], onDelete: SetNull)
   textbookId  String?
   textbook    Textbook? @relation(fields: [textbookId], references: [id], onDelete: SetNull)
-  content     String    // 세부 목표 (예: "Lecture 3 시청", "3장 읽기")
+  content     String
   isDone      Boolean   @default(false)
   order       Int       @default(0)
   createdAt   DateTime  @default(now())
 
+  @@index([userId])
   @@index([date])
   @@index([courseId])
   @@index([textbookId])
@@ -54,10 +62,11 @@ model DailyTask {
 
 model Goal {
   id         String     @id @default(cuid())
+  userId     String     // Supabase Auth User ID
   title      String
   periodType PeriodType
-  startDate  DateTime   // 시작일
-  endDate    DateTime   // 종료일
+  startDate  DateTime
+  endDate    DateTime
   parentId   String?
   parent     Goal?      @relation("GoalHierarchy", fields: [parentId], references: [id])
   children   Goal[]     @relation("GoalHierarchy")
@@ -65,6 +74,7 @@ model Goal {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
+  @@index([userId])
   @@index([periodType])
   @@index([startDate, endDate])
 }
@@ -85,12 +95,14 @@ enum GoalStatus {
 
 model QuestionLog {
   id         String   @id @default(cuid())
+  userId     String   // Supabase Auth User ID
   courseId   String?
   textbookId String?
   content    String
   isResolved Boolean  @default(false)
   createdAt  DateTime @default(now())
 
+  @@index([userId])
   @@index([courseId])
   @@index([textbookId])
 }

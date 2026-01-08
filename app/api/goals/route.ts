@@ -1,21 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
+import { getAuthUserId, unauthorized } from '@/app/lib/auth';
 
 // GET: 목표 조회
 export async function GET(request: NextRequest) {
     try {
+        const userId = await getAuthUserId();
+        if (!userId) return unauthorized();
+
         const { searchParams } = new URL(request.url);
         const periodType = searchParams.get('periodType');
         const year = searchParams.get('year');
         const month = searchParams.get('month');
 
-        let where: Record<string, unknown> = {};
+        const where: Record<string, unknown> = { userId };
 
-        if (periodType) {
-            where.periodType = periodType;
-        }
+        if (periodType) where.periodType = periodType;
 
-        // 특정 년월의 목표 조회
         if (year && month) {
             const startOfMonth = new Date(parseInt(year), parseInt(month) - 1, 1);
             const endOfMonth = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
@@ -25,13 +26,7 @@ export async function GET(request: NextRequest) {
 
         const goals = await prisma.goal.findMany({
             where,
-            include: {
-                children: {
-                    include: {
-                        children: true,
-                    },
-                },
-            },
+            include: { children: { include: { children: true } } },
             orderBy: { startDate: 'asc' },
         });
 
@@ -45,17 +40,17 @@ export async function GET(request: NextRequest) {
 // POST: 새 목표 생성
 export async function POST(request: NextRequest) {
     try {
-        const { title, periodType, startDate, endDate, parentId } = await request.json();
+        const userId = await getAuthUserId();
+        if (!userId) return unauthorized();
 
+        const { title, periodType, startDate, endDate, parentId } = await request.json();
         if (!title || !periodType || !startDate || !endDate) {
-            return NextResponse.json(
-                { error: 'title, periodType, startDate, endDate are required' },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: 'title, periodType, startDate, endDate are required' }, { status: 400 });
         }
 
         const goal = await prisma.goal.create({
             data: {
+                userId,
                 title,
                 periodType,
                 startDate: new Date(startDate),
@@ -74,14 +69,14 @@ export async function POST(request: NextRequest) {
 // PATCH: 목표 수정
 export async function PATCH(request: NextRequest) {
     try {
-        const { id, title, status, startDate, endDate } = await request.json();
+        const userId = await getAuthUserId();
+        if (!userId) return unauthorized();
 
-        if (!id) {
-            return NextResponse.json({ error: 'id is required' }, { status: 400 });
-        }
+        const { id, title, status, startDate, endDate } = await request.json();
+        if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
         const goal = await prisma.goal.update({
-            where: { id },
+            where: { id, userId },
             data: {
                 ...(title !== undefined && { title }),
                 ...(status !== undefined && { status }),
@@ -100,14 +95,14 @@ export async function PATCH(request: NextRequest) {
 // DELETE: 목표 삭제
 export async function DELETE(request: NextRequest) {
     try {
+        const userId = await getAuthUserId();
+        if (!userId) return unauthorized();
+
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
+        if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
-        if (!id) {
-            return NextResponse.json({ error: 'id is required' }, { status: 400 });
-        }
-
-        await prisma.goal.delete({ where: { id } });
+        await prisma.goal.delete({ where: { id, userId } });
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Error deleting goal:', error);
