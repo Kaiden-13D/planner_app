@@ -7,11 +7,10 @@ import { createClient } from '@/app/lib/supabase-browser';
 const navItems = [
     { href: '/', label: '대시보드', icon: '📊' },
     { href: '/goals', label: '목표 관리', icon: '🎯' },
-    { href: '/lectures', label: '강의', icon: '🎬' },
-    { href: '/books', label: '도서', icon: '📚' },
-    { href: '/assignments', label: '과제', icon: '📝' },
-    { href: '/questions', label: '질문 로그', icon: '❓' },
     { href: '/calendar', label: '캘린더', icon: '📅' },
+    { href: '/courses', label: '강의 목록', icon: '📚' },
+    { href: '/textbooks', label: '교재 목록', icon: '📖' },
+    { href: '/questions', label: '질문 로그', icon: '❓' },
 ];
 
 export default function Sidebar() {
@@ -63,7 +62,7 @@ export default function Sidebar() {
                     textAlign: 'center',
                     marginTop: '12px'
                 }}>
-                    Knowledge Debt Manager v0.1.0
+                    Knowledge Debt Manager v0.2.0
                 </p>
             </div>
         </nav>

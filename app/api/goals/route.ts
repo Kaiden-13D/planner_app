@@ -1,24 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
-import { PeriodType, GoalStatus } from '@prisma/client';
 
-// GET: 목표 목록 조회
+// GET: 목표 조회
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        const periodType = searchParams.get('periodType') as PeriodType | null;
-        const parentId = searchParams.get('parentId');
+        const periodType = searchParams.get('periodType');
+        const year = searchParams.get('year');
+        const month = searchParams.get('month');
+
+        let where: Record<string, unknown> = {};
+
+        if (periodType) {
+            where.periodType = periodType;
+        }
+
+        // 특정 년월의 목표 조회
+        if (year && month) {
+            const startOfMonth = new Date(parseInt(year), parseInt(month) - 1, 1);
+            const endOfMonth = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+            where.startDate = { lte: endOfMonth };
+            where.endDate = { gte: startOfMonth };
+        }
 
         const goals = await prisma.goal.findMany({
-            where: {
-                ...(periodType && { periodType }),
-                ...(parentId && { parentId }),
-            },
+            where,
             include: {
-                children: true,
-                parent: true,
+                children: {
+                    include: {
+                        children: true,
+                    },
+                },
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { startDate: 'asc' },
         });
 
         return NextResponse.json(goals);
@@ -31,12 +45,11 @@ export async function GET(request: NextRequest) {
 // POST: 새 목표 생성
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
-        const { title, periodType, parentId, targetDate } = body;
+        const { title, periodType, startDate, endDate, parentId } = await request.json();
 
-        if (!title || !periodType) {
+        if (!title || !periodType || !startDate || !endDate) {
             return NextResponse.json(
-                { error: 'title and periodType are required' },
+                { error: 'title, periodType, startDate, endDate are required' },
                 { status: 400 }
             );
         }
@@ -44,14 +57,10 @@ export async function POST(request: NextRequest) {
         const goal = await prisma.goal.create({
             data: {
                 title,
-                periodType: periodType as PeriodType,
+                periodType,
+                startDate: new Date(startDate),
+                endDate: new Date(endDate),
                 parentId: parentId || null,
-                targetDate: targetDate ? new Date(targetDate) : null,
-                status: GoalStatus.TODO,
-            },
-            include: {
-                children: true,
-                parent: true,
             },
         });
 
@@ -65,8 +74,7 @@ export async function POST(request: NextRequest) {
 // PATCH: 목표 수정
 export async function PATCH(request: NextRequest) {
     try {
-        const body = await request.json();
-        const { id, title, status, targetDate } = body;
+        const { id, title, status, startDate, endDate } = await request.json();
 
         if (!id) {
             return NextResponse.json({ error: 'id is required' }, { status: 400 });
@@ -75,13 +83,10 @@ export async function PATCH(request: NextRequest) {
         const goal = await prisma.goal.update({
             where: { id },
             data: {
-                ...(title && { title }),
-                ...(status && { status: status as GoalStatus }),
-                ...(targetDate !== undefined && { targetDate: targetDate ? new Date(targetDate) : null }),
-            },
-            include: {
-                children: true,
-                parent: true,
+                ...(title !== undefined && { title }),
+                ...(status !== undefined && { status }),
+                ...(startDate !== undefined && { startDate: new Date(startDate) }),
+                ...(endDate !== undefined && { endDate: new Date(endDate) }),
             },
         });
 
@@ -102,10 +107,7 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'id is required' }, { status: 400 });
         }
 
-        await prisma.goal.delete({
-            where: { id },
-        });
-
+        await prisma.goal.delete({ where: { id } });
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Error deleting goal:', error);

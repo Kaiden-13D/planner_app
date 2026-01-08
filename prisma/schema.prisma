@@ -11,18 +11,62 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// 목표 관리 (계층 구조)
+// ========== 마스터 리스트 ==========
+
+// 강의 (이름만)
+model Course {
+  id        String      @id @default(cuid())
+  name      String      // 예: "알고리즘", "미적분학"
+  color     String?     // 구분 색상
+  tasks     DailyTask[]
+  createdAt DateTime    @default(now())
+}
+
+// 교재 (이름만)
+model Textbook {
+  id        String      @id @default(cuid())
+  name      String      // 예: "클린 코드", "OSTEP"
+  color     String?     // 구분 색상
+  tasks     DailyTask[]
+  createdAt DateTime    @default(now())
+}
+
+// ========== 일일 Task ==========
+
+model DailyTask {
+  id          String    @id @default(cuid())
+  date        DateTime  // 해당 날짜
+  courseId    String?
+  course      Course?   @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  textbookId  String?
+  textbook    Textbook? @relation(fields: [textbookId], references: [id], onDelete: SetNull)
+  content     String    // 세부 목표 (예: "Lecture 3 시청", "3장 읽기")
+  isDone      Boolean   @default(false)
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([date])
+  @@index([courseId])
+  @@index([textbookId])
+}
+
+// ========== 목표 관리 ==========
+
 model Goal {
   id         String     @id @default(cuid())
   title      String
   periodType PeriodType
+  startDate  DateTime   // 시작일
+  endDate    DateTime   // 종료일
   parentId   String?
   parent     Goal?      @relation("GoalHierarchy", fields: [parentId], references: [id])
   children   Goal[]     @relation("GoalHierarchy")
   status     GoalStatus @default(TODO)
-  targetDate DateTime?
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
+
+  @@index([periodType])
+  @@index([startDate, endDate])
 }
 
 enum PeriodType {
@@ -37,81 +81,16 @@ enum GoalStatus {
   DONE
 }
 
-// 강의 관리
-model Lecture {
-  id         String        @id @default(cuid())
-  subject    String        // 과목명 (예: CS285)
-  lecNum     Int           // 강의 번호
-  partNum    Int?          // 파트 번호 (선택)
-  title      String?       // 강의 제목
-  duration   Int           // 러닝타임 (분)
-  isWatched  Boolean       @default(false)
-  isReviewed Boolean       @default(false)
-  watchedAt  DateTime?
-  questions  QuestionLog[]
-  createdAt  DateTime      @default(now())
+// ========== 질문 로그 ==========
 
-  @@index([subject, lecNum])
-}
-
-// 도서 관리
-model Book {
-  id           String   @id @default(cuid())
-  title        String   // 도서명
-  chapterNum   Int
-  chapterTitle String?
-  pageStart    Int
-  pageEnd      Int
-  isCompleted  Boolean  @default(false)
-  createdAt    DateTime @default(now())
-
-  @@index([title])
-}
-
-// 과제 관리
-model Assignment {
-  id           String        @id @default(cuid())
-  title        String
-  subject      String?       // 관련 과목
-  deadlineAt   DateTime
-  progressRate Float         @default(0) // 0~100
-  subtasks     Subtask[]
-  questions    QuestionLog[]
-  createdAt    DateTime      @default(now())
-
-  @@index([deadlineAt])
-}
-
-// 서브태스크 (과제 하위 항목)
-model Subtask {
-  id           String     @id @default(cuid())
-  assignmentId String
-  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  content      String
-  isDone       Boolean    @default(false)
-  order        Int        @default(0)
-
-  @@index([assignmentId])
-}
-
-// 질문 로그
 model QuestionLog {
-  id           String      @id @default(cuid())
-  refType      RefType
-  lectureId    String?
-  lecture      Lecture?    @relation(fields: [lectureId], references: [id], onDelete: SetNull)
-  assignmentId String?
-  assignment   Assignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
-  slideNum     Int?        // 슬라이드 번호 (선택)
-  content      String
-  isResolved   Boolean     @default(false)
-  createdAt    DateTime    @default(now())
+  id         String   @id @default(cuid())
+  courseId   String?
+  textbookId String?
+  content    String
+  isResolved Boolean  @default(false)
+  createdAt  DateTime @default(now())
 
-  @@index([lectureId])
-  @@index([assignmentId])
-}
-
-enum RefType {
-  LECTURE
-  ASSIGNMENT
+  @@index([courseId])
+  @@index([textbookId])
 }

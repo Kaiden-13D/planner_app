@@ -2,52 +2,44 @@
 
 import { useEffect, useState } from 'react';
 
-type PeriodType = 'MONTH' | 'WEEK' | 'DAY';
-type GoalStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
-
 interface Goal {
     id: string;
     title: string;
-    periodType: PeriodType;
-    parentId: string | null;
-    status: GoalStatus;
-    targetDate: string | null;
-    children: Goal[];
+    periodType: 'MONTH' | 'WEEK' | 'DAY';
+    startDate: string;
+    endDate: string;
+    status: 'TODO' | 'IN_PROGRESS' | 'DONE';
 }
 
-const periodLabels: Record<PeriodType, string> = {
-    MONTH: '월간 목표',
-    WEEK: '주간 목표',
-    DAY: '일간 목표',
-};
+type Tab = 'MONTH' | 'WEEK' | 'DAY';
 
-const statusLabels: Record<GoalStatus, { label: string; badge: string }> = {
-    TODO: { label: '예정', badge: 'badge-secondary' },
-    IN_PROGRESS: { label: '진행중', badge: 'badge-warning' },
-    DONE: { label: '완료', badge: 'badge-success' },
-};
+function getWeekRange(date: Date): { start: Date; end: Date } {
+    const start = new Date(date);
+    start.setDate(date.getDate() - date.getDay());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { start, end };
+}
+
+function formatDate(date: Date): string {
+    return `${date.getMonth() + 1}/${date.getDate()}`;
+}
 
 export default function GoalsPage() {
     const [goals, setGoals] = useState<Goal[]>([]);
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<Tab>('MONTH');
+    const [currentDate, setCurrentDate] = useState(new Date());
     const [showModal, setShowModal] = useState(false);
-    const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('WEEK');
-
-    // Form state
     const [title, setTitle] = useState('');
-    const [periodType, setPeriodType] = useState<PeriodType>('WEEK');
-    const [parentId, setParentId] = useState('');
-    const [targetDate, setTargetDate] = useState('');
 
-    useEffect(() => {
-        fetchGoals();
-    }, []);
+    useEffect(() => { fetchGoals(); }, [activeTab, currentDate]);
 
     async function fetchGoals() {
         try {
-            const res = await fetch('/api/goals');
+            const res = await fetch(`/api/goals?periodType=${activeTab}&year=${currentDate.getFullYear()}&month=${currentDate.getMonth() + 1}`);
             const data = await res.json();
-            setGoals(data);
+            setGoals(Array.isArray(data) ? data.filter((g: Goal) => g.periodType === activeTab) : []);
         } catch (error) {
             console.error('Failed to fetch goals:', error);
         } finally {
@@ -55,36 +47,49 @@ export default function GoalsPage() {
         }
     }
 
+    function getDateRange() {
+        if (activeTab === 'MONTH') {
+            return {
+                start: new Date(currentDate.getFullYear(), currentDate.getMonth(), 1),
+                end: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0),
+            };
+        } else if (activeTab === 'WEEK') {
+            return getWeekRange(currentDate);
+        } else {
+            return { start: currentDate, end: currentDate };
+        }
+    }
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        const { start, end } = getDateRange();
+
         try {
             await fetch('/api/goals', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     title,
-                    periodType,
-                    parentId: parentId || null,
-                    targetDate: targetDate || null,
+                    periodType: activeTab,
+                    startDate: start.toISOString(),
+                    endDate: end.toISOString(),
                 }),
             });
+            setTitle('');
             setShowModal(false);
-            resetForm();
             fetchGoals();
         } catch (error) {
             console.error('Failed to create goal:', error);
         }
     }
 
-    async function updateStatus(goal: Goal, newStatus: GoalStatus) {
+    async function toggleStatus(goal: Goal) {
+        const nextStatus = goal.status === 'TODO' ? 'IN_PROGRESS' : goal.status === 'IN_PROGRESS' ? 'DONE' : 'TODO';
         try {
             await fetch('/api/goals', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    id: goal.id,
-                    status: newStatus,
-                }),
+                body: JSON.stringify({ id: goal.id, status: nextStatus }),
             });
             fetchGoals();
         } catch (error) {
@@ -93,7 +98,7 @@ export default function GoalsPage() {
     }
 
     async function deleteGoal(id: string) {
-        if (!confirm('정말 삭제하시겠습니까? 하위 목표도 함께 삭제됩니다.')) return;
+        if (!confirm('정말 삭제하시겠습니까?')) return;
         try {
             await fetch(`/api/goals?id=${id}`, { method: 'DELETE' });
             fetchGoals();
@@ -102,207 +107,149 @@ export default function GoalsPage() {
         }
     }
 
-    function resetForm() {
-        setTitle('');
-        setPeriodType('WEEK');
-        setParentId('');
-        setTargetDate('');
+    function navigate(delta: number) {
+        const newDate = new Date(currentDate);
+        if (activeTab === 'MONTH') {
+            newDate.setMonth(newDate.getMonth() + delta);
+        } else if (activeTab === 'WEEK') {
+            newDate.setDate(newDate.getDate() + delta * 7);
+        } else {
+            newDate.setDate(newDate.getDate() + delta);
+        }
+        setCurrentDate(newDate);
     }
 
-    // Filter by period
-    const filteredGoals = goals.filter(g => g.periodType === selectedPeriod && !g.parentId);
-    const parentGoals = goals.filter(g => g.periodType !== 'DAY');
-
-    // Get children for a goal
-    function getChildren(goalId: string): Goal[] {
-        return goals.filter(g => g.parentId === goalId);
+    function getPeriodTitle() {
+        const { start, end } = getDateRange();
+        if (activeTab === 'MONTH') {
+            return `📅 ${currentDate.getFullYear()}년 ${currentDate.getMonth() + 1}월 목표`;
+        } else if (activeTab === 'WEEK') {
+            const weekNum = Math.ceil(currentDate.getDate() / 7);
+            return `📆 ${currentDate.getMonth() + 1}월 ${weekNum}주차 (${formatDate(start)} ~ ${formatDate(end)})`;
+        } else {
+            return `📌 ${currentDate.getMonth() + 1}월 ${currentDate.getDate()}일 (${['일', '월', '화', '수', '목', '금', '토'][currentDate.getDay()]})`;
+        }
     }
+
+    const statusEmoji = { TODO: '⬜', IN_PROGRESS: '🔄', DONE: '✅' };
+    const statusColor = { TODO: 'var(--text-secondary)', IN_PROGRESS: 'var(--warning)', DONE: 'var(--success)' };
 
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">목표 관리</h1>
-                <p className="page-subtitle">월간, 주간, 일간 목표를 계층적으로 관리하세요</p>
+                <h1 className="page-title">🎯 목표 관리</h1>
+                <p className="page-subtitle">월간, 주간, 일간 목표를 설정하세요</p>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-                <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            {/* 탭 */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+                {(['MONTH', 'WEEK', 'DAY'] as Tab[]).map((tab) => (
+                    <button
+                        key={tab}
+                        className={`btn ${activeTab === tab ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setActiveTab(tab)}
+                    >
+                        {tab === 'MONTH' ? '📅 월간' : tab === 'WEEK' ? '📆 주간' : '📌 일간'}
+                    </button>
+                ))}
+            </div>
+
+            {/* 플래너 카드 */}
+            <div className="card" style={{
+                border: '2px solid var(--border-color)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                background: 'linear-gradient(to bottom, var(--bg-card), var(--bg-secondary))',
+            }}>
+                {/* 헤더 */}
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '20px',
+                    paddingBottom: '16px',
+                    borderBottom: '1px solid var(--border-color)',
+                }}>
+                    <button className="btn btn-secondary btn-sm" onClick={() => navigate(-1)}>← 이전</button>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: '700' }}>{getPeriodTitle()}</h2>
+                    <button className="btn btn-secondary btn-sm" onClick={() => navigate(1)}>다음 →</button>
+                </div>
+
+                {/* 목표 리스트 */}
+                {loading ? (
+                    <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '40px' }}>로딩 중...</p>
+                ) : goals.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px' }}>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>아직 목표가 없습니다</p>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {goals.map((goal) => (
+                            <div
+                                key={goal.id}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    padding: '12px 16px',
+                                    background: 'var(--bg-tertiary)',
+                                    borderRadius: '8px',
+                                    borderLeft: `4px solid ${statusColor[goal.status]}`,
+                                }}
+                            >
+                                <span
+                                    onClick={() => toggleStatus(goal)}
+                                    style={{ fontSize: '1.25rem', cursor: 'pointer' }}
+                                >
+                                    {statusEmoji[goal.status]}
+                                </span>
+                                <span style={{
+                                    flex: 1,
+                                    textDecoration: goal.status === 'DONE' ? 'line-through' : 'none',
+                                    color: goal.status === 'DONE' ? 'var(--text-muted)' : 'inherit',
+                                }}>
+                                    {goal.title}
+                                </span>
+                                <button className="btn btn-danger btn-sm" onClick={() => deleteGoal(goal.id)}>×</button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* 추가 버튼 */}
+                <button
+                    className="btn btn-primary"
+                    style={{ width: '100%', marginTop: '20px' }}
+                    onClick={() => setShowModal(true)}
+                >
                     + 목표 추가
                 </button>
-                <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
-                    {(['MONTH', 'WEEK', 'DAY'] as PeriodType[]).map((period) => (
-                        <button
-                            key={period}
-                            className={`btn ${selectedPeriod === period ? 'btn-primary' : 'btn-secondary'}`}
-                            onClick={() => setSelectedPeriod(period)}
-                        >
-                            {periodLabels[period]}
-                        </button>
-                    ))}
-                </div>
             </div>
 
-            {loading ? (
-                <div className="card" style={{ textAlign: 'center', padding: '60px' }}>
-                    <p style={{ color: 'var(--text-secondary)' }}>로딩 중...</p>
-                </div>
-            ) : filteredGoals.length === 0 ? (
-                <div className="card" style={{ textAlign: 'center', padding: '60px' }}>
-                    <p style={{ fontSize: '3rem', marginBottom: '16px' }}>🎯</p>
-                    <p style={{ color: 'var(--text-secondary)' }}>
-                        {periodLabels[selectedPeriod]}가 없습니다
-                    </p>
-                </div>
-            ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {filteredGoals.map((goal) => (
-                        <GoalCard
-                            key={goal.id}
-                            goal={goal}
-                            getChildren={getChildren}
-                            updateStatus={updateStatus}
-                            deleteGoal={deleteGoal}
-                        />
-                    ))}
-                </div>
-            )}
-
-            {/* Add Modal */}
+            {/* 모달 */}
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2 className="modal-title">목표 추가</h2>
+                            <h2 className="modal-title">{getPeriodTitle().replace(/📅|📆|📌/, '✨')} 추가</h2>
                             <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
                         </div>
                         <form onSubmit={handleSubmit}>
-                            <div style={{ marginBottom: '16px' }}>
-                                <label className="label">목표 내용 *</label>
+                            <div style={{ marginBottom: '24px' }}>
+                                <label className="label">목표 내용</label>
                                 <input
                                     className="input"
-                                    placeholder="예: 이번 주 강의 완료하기"
+                                    placeholder="이번 기간에 달성할 목표를 입력하세요"
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     required
-                                />
-                            </div>
-                            <div style={{ marginBottom: '16px' }}>
-                                <label className="label">목표 유형 *</label>
-                                <select
-                                    className="input"
-                                    value={periodType}
-                                    onChange={(e) => setPeriodType(e.target.value as PeriodType)}
-                                >
-                                    <option value="MONTH">월간 목표</option>
-                                    <option value="WEEK">주간 목표</option>
-                                    <option value="DAY">일간 목표</option>
-                                </select>
-                            </div>
-                            <div style={{ marginBottom: '16px' }}>
-                                <label className="label">상위 목표 (선택)</label>
-                                <select
-                                    className="input"
-                                    value={parentId}
-                                    onChange={(e) => setParentId(e.target.value)}
-                                >
-                                    <option value="">없음</option>
-                                    {parentGoals.map((g) => (
-                                        <option key={g.id} value={g.id}>
-                                            [{periodLabels[g.periodType]}] {g.title}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div style={{ marginBottom: '24px' }}>
-                                <label className="label">목표 날짜</label>
-                                <input
-                                    className="input"
-                                    type="date"
-                                    value={targetDate}
-                                    onChange={(e) => setTargetDate(e.target.value)}
+                                    autoFocus
                                 />
                             </div>
                             <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
-                                목표 추가하기
+                                목표 추가
                             </button>
                         </form>
                     </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-function GoalCard({
-    goal,
-    getChildren,
-    updateStatus,
-    deleteGoal,
-    depth = 0
-}: {
-    goal: Goal;
-    getChildren: (id: string) => Goal[];
-    updateStatus: (goal: Goal, status: GoalStatus) => void;
-    deleteGoal: (id: string) => void;
-    depth?: number;
-}) {
-    const children = getChildren(goal.id);
-    const statusInfo = statusLabels[goal.status];
-
-    return (
-        <div style={{ marginLeft: depth * 24 }}>
-            <div className={`card ${goal.status === 'DONE' ? '' : goal.status === 'IN_PROGRESS' ? 'debt-card warning' : ''}`}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div
-                        className={`checkbox ${goal.status === 'DONE' ? 'checked' : ''}`}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => updateStatus(goal, goal.status === 'DONE' ? 'TODO' : 'DONE')}
-                    >
-                        {goal.status === 'DONE' && '✓'}
-                    </div>
-                    <span
-                        style={{
-                            flex: 1,
-                            textDecoration: goal.status === 'DONE' ? 'line-through' : 'none',
-                            opacity: goal.status === 'DONE' ? 0.6 : 1,
-                        }}
-                    >
-                        {goal.title}
-                    </span>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <select
-                            className="input"
-                            style={{ width: 'auto', padding: '6px 12px' }}
-                            value={goal.status}
-                            onChange={(e) => updateStatus(goal, e.target.value as GoalStatus)}
-                        >
-                            <option value="TODO">예정</option>
-                            <option value="IN_PROGRESS">진행중</option>
-                            <option value="DONE">완료</option>
-                        </select>
-                        <button className="btn btn-sm btn-danger" onClick={() => deleteGoal(goal.id)}>
-                            삭제
-                        </button>
-                    </div>
-                </div>
-                {goal.targetDate && (
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '8px', marginLeft: '32px' }}>
-                        📅 {new Date(goal.targetDate).toLocaleDateString('ko-KR')}
-                    </p>
-                )}
-            </div>
-            {children.length > 0 && (
-                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {children.map((child) => (
-                        <GoalCard
-                            key={child.id}
-                            goal={child}
-                            getChildren={getChildren}
-                            updateStatus={updateStatus}
-                            deleteGoal={deleteGoal}
-                            depth={depth + 1}
-                        />
-                    ))}
                 </div>
             )}
         </div>
