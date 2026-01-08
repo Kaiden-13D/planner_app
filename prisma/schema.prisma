@@ -1,0 +1,115 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 목표 관리 (계층 구조)
+model Goal {
+  id         String     @id @default(cuid())
+  title      String
+  periodType PeriodType
+  parentId   String?
+  parent     Goal?      @relation("GoalHierarchy", fields: [parentId], references: [id])
+  children   Goal[]     @relation("GoalHierarchy")
+  status     GoalStatus @default(TODO)
+  targetDate DateTime?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+enum PeriodType {
+  MONTH
+  WEEK
+  DAY
+}
+
+enum GoalStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+// 강의 관리
+model Lecture {
+  id         String        @id @default(cuid())
+  subject    String        // 과목명 (예: CS285)
+  lecNum     Int           // 강의 번호
+  partNum    Int?          // 파트 번호 (선택)
+  title      String?       // 강의 제목
+  duration   Int           // 러닝타임 (분)
+  isWatched  Boolean       @default(false)
+  isReviewed Boolean       @default(false)
+  watchedAt  DateTime?
+  questions  QuestionLog[]
+  createdAt  DateTime      @default(now())
+
+  @@index([subject, lecNum])
+}
+
+// 도서 관리
+model Book {
+  id           String   @id @default(cuid())
+  title        String   // 도서명
+  chapterNum   Int
+  chapterTitle String?
+  pageStart    Int
+  pageEnd      Int
+  isCompleted  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([title])
+}
+
+// 과제 관리
+model Assignment {
+  id           String        @id @default(cuid())
+  title        String
+  subject      String?       // 관련 과목
+  deadlineAt   DateTime
+  progressRate Float         @default(0) // 0~100
+  subtasks     Subtask[]
+  questions    QuestionLog[]
+  createdAt    DateTime      @default(now())
+
+  @@index([deadlineAt])
+}
+
+// 서브태스크 (과제 하위 항목)
+model Subtask {
+  id           String     @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  content      String
+  isDone       Boolean    @default(false)
+  order        Int        @default(0)
+
+  @@index([assignmentId])
+}
+
+// 질문 로그
+model QuestionLog {
+  id           String      @id @default(cuid())
+  refType      RefType
+  lectureId    String?
+  lecture      Lecture?    @relation(fields: [lectureId], references: [id], onDelete: SetNull)
+  assignmentId String?
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  slideNum     Int?        // 슬라이드 번호 (선택)
+  content      String
+  isResolved   Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+
+  @@index([lectureId])
+  @@index([assignmentId])
+}
+
+enum RefType {
+  LECTURE
+  ASSIGNMENT
+}
