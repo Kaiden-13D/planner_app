@@ -40,10 +40,23 @@ export default function CalendarPage() {
     const [showModal, setShowModal] = useState(false);
 
     // Form state
-    const [content, setContent] = useState('');
     const [refType, setRefType] = useState<'none' | 'course' | 'textbook'>('none');
     const [courseId, setCourseId] = useState('');
     const [textbookId, setTextbookId] = useState('');
+
+    // 강의 세부 정보
+    const [lectureNum, setLectureNum] = useState('');
+    const [partNum, setPartNum] = useState('');
+    const [lectureAction, setLectureAction] = useState<'watch' | 'review'>('watch');
+
+    // 교재 세부 정보
+    const [chapterNum, setChapterNum] = useState('');
+    const [pageStart, setPageStart] = useState('');
+    const [pageEnd, setPageEnd] = useState('');
+    const [bookAction, setBookAction] = useState<'read' | 'review'>('read');
+
+    // 일반 Task
+    const [customContent, setCustomContent] = useState('');
 
     useEffect(() => { fetchData(); }, [currentDate]);
 
@@ -101,9 +114,35 @@ export default function CalendarPage() {
         return days;
     }
 
+    function buildContent(): string {
+        if (refType === 'course') {
+            const course = courses.find(c => c.id === courseId);
+            const actionText = lectureAction === 'watch' ? '시청' : '복습';
+            let content = `Lecture ${lectureNum}`;
+            if (partNum) content += ` Part ${partNum}`;
+            content += ` ${actionText}`;
+            return content;
+        } else if (refType === 'textbook') {
+            const actionText = bookAction === 'read' ? '읽기' : '복습';
+            let content = '';
+            if (chapterNum) content = `${chapterNum}장 `;
+            if (pageStart && pageEnd) {
+                content += `(p.${pageStart}-${pageEnd}) `;
+            } else if (pageStart) {
+                content += `(p.${pageStart}~) `;
+            }
+            content += actionText;
+            return content.trim();
+        }
+        return customContent;
+    }
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        if (!selectedDate || !content.trim()) return;
+        if (!selectedDate) return;
+
+        const content = buildContent();
+        if (!content.trim()) return;
 
         try {
             await fetch('/api/tasks', {
@@ -147,10 +186,17 @@ export default function CalendarPage() {
     }
 
     function resetForm() {
-        setContent('');
         setRefType('none');
         setCourseId('');
         setTextbookId('');
+        setLectureNum('');
+        setPartNum('');
+        setLectureAction('watch');
+        setChapterNum('');
+        setPageStart('');
+        setPageEnd('');
+        setBookAction('read');
+        setCustomContent('');
     }
 
     function openModal(date: Date) {
@@ -280,45 +326,112 @@ export default function CalendarPage() {
             {/* Modal */}
             {showModal && selectedDate && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
                         <div className="modal-header">
                             <h2 className="modal-title">📌 {selectedDate.getMonth() + 1}/{selectedDate.getDate()} Task 추가</h2>
                             <button className="modal-close" onClick={() => { setShowModal(false); resetForm(); }}>✕</button>
                         </div>
                         <form onSubmit={handleSubmit}>
+                            {/* Task 유형 선택 */}
                             <div style={{ marginBottom: '16px' }}>
-                                <label className="label">연결 (선택)</label>
+                                <label className="label">Task 유형</label>
                                 <div style={{ display: 'flex', gap: '8px' }}>
-                                    <button type="button" className={`btn ${refType === 'none' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setRefType('none')} style={{ flex: 1 }}>없음</button>
                                     <button type="button" className={`btn ${refType === 'course' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setRefType('course')} style={{ flex: 1 }}>📚 강의</button>
                                     <button type="button" className={`btn ${refType === 'textbook' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setRefType('textbook')} style={{ flex: 1 }}>📖 교재</button>
+                                    <button type="button" className={`btn ${refType === 'none' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setRefType('none')} style={{ flex: 1 }}>✏️ 기타</button>
                                 </div>
                             </div>
 
+                            {/* 강의 선택 및 세부 설정 */}
                             {refType === 'course' && (
-                                <div style={{ marginBottom: '16px' }}>
-                                    <label className="label">강의 선택</label>
-                                    <select className="input" value={courseId} onChange={(e) => setCourseId(e.target.value)} required>
-                                        <option value="">선택하세요</option>
-                                        {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                    </select>
+                                <div style={{ background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+                                    <div style={{ marginBottom: '12px' }}>
+                                        <label className="label">강의 선택 *</label>
+                                        <select className="input" value={courseId} onChange={(e) => setCourseId(e.target.value)} required>
+                                            <option value="">선택하세요</option>
+                                            {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                                        <div>
+                                            <label className="label">Lecture 번호 *</label>
+                                            <input className="input" type="number" placeholder="1" value={lectureNum} onChange={(e) => setLectureNum(e.target.value)} required min="1" />
+                                        </div>
+                                        <div>
+                                            <label className="label">Part (선택)</label>
+                                            <input className="input" type="number" placeholder="없으면 비워두세요" value={partNum} onChange={(e) => setPartNum(e.target.value)} min="1" />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="label">활동</label>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button type="button" className={`btn btn-sm ${lectureAction === 'watch' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setLectureAction('watch')} style={{ flex: 1 }}>📺 시청</button>
+                                            <button type="button" className={`btn btn-sm ${lectureAction === 'review' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setLectureAction('review')} style={{ flex: 1 }}>🔄 복습</button>
+                                        </div>
+                                    </div>
+
+                                    {courseId && lectureNum && (
+                                        <div style={{ marginTop: '12px', padding: '8px', background: 'var(--bg-card)', borderRadius: '6px' }}>
+                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>미리보기: </span>
+                                            <strong>{courses.find(c => c.id === courseId)?.name}</strong> - {buildContent()}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
+                            {/* 교재 선택 및 세부 설정 */}
                             {refType === 'textbook' && (
-                                <div style={{ marginBottom: '16px' }}>
-                                    <label className="label">교재 선택</label>
-                                    <select className="input" value={textbookId} onChange={(e) => setTextbookId(e.target.value)} required>
-                                        <option value="">선택하세요</option>
-                                        {textbooks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                    </select>
+                                <div style={{ background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+                                    <div style={{ marginBottom: '12px' }}>
+                                        <label className="label">교재 선택 *</label>
+                                        <select className="input" value={textbookId} onChange={(e) => setTextbookId(e.target.value)} required>
+                                            <option value="">선택하세요</option>
+                                            {textbooks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div style={{ marginBottom: '12px' }}>
+                                        <label className="label">챕터 (선택)</label>
+                                        <input className="input" type="number" placeholder="예: 3" value={chapterNum} onChange={(e) => setChapterNum(e.target.value)} min="1" />
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                                        <div>
+                                            <label className="label">시작 페이지</label>
+                                            <input className="input" type="number" placeholder="예: 50" value={pageStart} onChange={(e) => setPageStart(e.target.value)} min="1" />
+                                        </div>
+                                        <div>
+                                            <label className="label">끝 페이지</label>
+                                            <input className="input" type="number" placeholder="예: 75" value={pageEnd} onChange={(e) => setPageEnd(e.target.value)} min="1" />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="label">활동</label>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button type="button" className={`btn btn-sm ${bookAction === 'read' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setBookAction('read')} style={{ flex: 1 }}>📖 읽기</button>
+                                            <button type="button" className={`btn btn-sm ${bookAction === 'review' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setBookAction('review')} style={{ flex: 1 }}>🔄 복습</button>
+                                        </div>
+                                    </div>
+
+                                    {textbookId && (chapterNum || pageStart) && (
+                                        <div style={{ marginTop: '12px', padding: '8px', background: 'var(--bg-card)', borderRadius: '6px' }}>
+                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>미리보기: </span>
+                                            <strong>{textbooks.find(t => t.id === textbookId)?.name}</strong> - {buildContent()}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
-                            <div style={{ marginBottom: '24px' }}>
-                                <label className="label">Task 내용 *</label>
-                                <input className="input" placeholder="예: Lecture 3 시청, 3장 읽기" value={content} onChange={(e) => setContent(e.target.value)} required autoFocus />
-                            </div>
+                            {/* 일반 Task */}
+                            {refType === 'none' && (
+                                <div style={{ marginBottom: '16px' }}>
+                                    <label className="label">Task 내용 *</label>
+                                    <input className="input" placeholder="자유롭게 입력하세요" value={customContent} onChange={(e) => setCustomContent(e.target.value)} required autoFocus />
+                                </div>
+                            )}
 
                             <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Task 추가</button>
                         </form>
