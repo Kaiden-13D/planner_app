@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
         const userId = await getAuthUserId();
         if (!userId) return unauthorized();
 
-        const { courseId, textbookId, content } = await request.json();
+        const { courseId, textbookId, lectureNo, partNo, slideNo, chapterNo, pageNo, content } = await request.json();
         if (!content) return NextResponse.json({ error: 'content is required' }, { status: 400 });
 
         const question = await prisma.questionLog.create({
@@ -40,6 +40,11 @@ export async function POST(request: NextRequest) {
                 userId,
                 courseId: courseId || null,
                 textbookId: textbookId || null,
+                lectureNo: lectureNo || null,
+                partNo: partNo || null,
+                slideNo: slideNo || null,
+                chapterNo: chapterNo || null,
+                pageNo: pageNo || null,
                 content,
             },
         });

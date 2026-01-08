@@ -16,6 +16,11 @@ interface QuestionLog {
     id: string;
     courseId: string | null;
     textbookId: string | null;
+    lectureNo: number | null;
+    partNo: number | null;
+    slideNo: number | null;
+    chapterNo: number | null;
+    pageNo: number | null;
     content: string;
     isResolved: boolean;
     createdAt: string;
@@ -34,6 +39,15 @@ export default function QuestionsPage() {
     const [courseId, setCourseId] = useState('');
     const [textbookId, setTextbookId] = useState('');
     const [content, setContent] = useState('');
+
+    // 강의 세부정보
+    const [lectureNo, setLectureNo] = useState('');
+    const [partNo, setPartNo] = useState('');
+    const [slideNo, setSlideNo] = useState('');
+
+    // 교재 세부정보
+    const [chapterNo, setChapterNo] = useState('');
+    const [pageNo, setPageNo] = useState('');
 
     useEffect(() => { fetchData(); }, []);
 
@@ -63,6 +77,11 @@ export default function QuestionsPage() {
                 body: JSON.stringify({
                     courseId: refType === 'course' ? courseId : null,
                     textbookId: refType === 'textbook' ? textbookId : null,
+                    lectureNo: refType === 'course' && lectureNo ? parseInt(lectureNo) : null,
+                    partNo: refType === 'course' && partNo ? parseInt(partNo) : null,
+                    slideNo: refType === 'course' && slideNo ? parseInt(slideNo) : null,
+                    chapterNo: refType === 'textbook' && chapterNo ? parseInt(chapterNo) : null,
+                    pageNo: refType === 'textbook' && pageNo ? parseInt(pageNo) : null,
                     content,
                 }),
             });
@@ -102,16 +121,28 @@ export default function QuestionsPage() {
         setCourseId('');
         setTextbookId('');
         setContent('');
+        setLectureNo('');
+        setPartNo('');
+        setSlideNo('');
+        setChapterNo('');
+        setPageNo('');
     }
 
-    function getRefName(q: QuestionLog) {
+    function getRefInfo(q: QuestionLog) {
         if (q.courseId) {
             const course = courses.find((c) => c.id === q.courseId);
-            return course ? `📚 ${course.name}` : '';
+            let info = `📚 ${course?.name || '강의'}`;
+            if (q.lectureNo) info += ` Lec ${q.lectureNo}`;
+            if (q.partNo) info += ` Part ${q.partNo}`;
+            if (q.slideNo) info += ` Slide ${q.slideNo}`;
+            return info;
         }
         if (q.textbookId) {
             const textbook = textbooks.find((t) => t.id === q.textbookId);
-            return textbook ? `📖 ${textbook.name}` : '';
+            let info = `📖 ${textbook?.name || '교재'}`;
+            if (q.chapterNo) info += ` ${q.chapterNo}장`;
+            if (q.pageNo) info += ` p.${q.pageNo}`;
+            return info;
         }
         return '';
     }
@@ -131,12 +162,12 @@ export default function QuestionsPage() {
                 <p className="page-subtitle">학습 중 생긴 질문을 기록하고 관리하세요</p>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ 질문 추가</button>
                 <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
                     <button className={`btn ${filter === 'all' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter('all')}>전체 ({questions.length})</button>
-                    <button className={`btn ${filter === 'unresolved' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter('unresolved')}>미해결 ({unresolvedCount})</button>
-                    <button className={`btn ${filter === 'resolved' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter('resolved')}>해결됨</button>
+                    <button className={`btn ${filter === 'unresolved' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter('unresolved')}>❌ 미해결 ({unresolvedCount})</button>
+                    <button className={`btn ${filter === 'resolved' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter('resolved')}>✅ 해결됨</button>
                 </div>
             </div>
 
@@ -152,19 +183,44 @@ export default function QuestionsPage() {
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {filteredQuestions.map((question) => (
-                        <div key={question.id} className="card" style={{ opacity: question.isResolved ? 0.7 : 1 }}>
+                        <div key={question.id} className="card" style={{
+                            opacity: question.isResolved ? 0.7 : 1,
+                            borderLeft: `4px solid ${question.isResolved ? 'var(--success)' : 'var(--warning)'}`,
+                        }}>
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                                <input type="checkbox" checked={question.isResolved} onChange={() => toggleResolved(question)} style={{ marginTop: '4px', width: '18px', height: '18px' }} />
+                                <button
+                                    onClick={() => toggleResolved(question)}
+                                    style={{
+                                        fontSize: '1.5rem',
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                    }}
+                                    title={question.isResolved ? '미해결로 변경' : '해결됨으로 변경'}
+                                >
+                                    {question.isResolved ? '✅' : '⬜'}
+                                </button>
                                 <div style={{ flex: 1 }}>
-                                    <p style={{ textDecoration: question.isResolved ? 'line-through' : 'none', marginBottom: '8px' }}>{question.content}</p>
-                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                        {getRefName(question) && <span className="badge badge-success">{getRefName(question)}</span>}
+                                    <p style={{
+                                        textDecoration: question.isResolved ? 'line-through' : 'none',
+                                        marginBottom: '8px',
+                                        fontSize: '1rem',
+                                        color: question.isResolved ? 'var(--text-muted)' : 'inherit',
+                                    }}>
+                                        {question.content}
+                                    </p>
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                        {getRefInfo(question) && (
+                                            <span className="badge badge-success" style={{ fontSize: '0.8rem' }}>{getRefInfo(question)}</span>
+                                        )}
                                         <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                                             {new Date(question.createdAt).toLocaleDateString('ko-KR')}
                                         </span>
                                     </div>
                                 </div>
-                                <button className="btn btn-sm btn-danger" onClick={() => deleteQuestion(question.id)}>삭제</button>
+                                <button className="btn btn-danger btn-sm" onClick={() => deleteQuestion(question.id)}>삭제</button>
                             </div>
                         </div>
                     ))}
@@ -174,14 +230,14 @@ export default function QuestionsPage() {
             {/* Modal */}
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
                         <div className="modal-header">
                             <h2 className="modal-title">질문 추가</h2>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+                            <button className="modal-close" onClick={() => { setShowModal(false); resetForm(); }}>✕</button>
                         </div>
                         <form onSubmit={handleSubmit}>
                             <div style={{ marginBottom: '16px' }}>
-                                <label className="label">연관 (선택)</label>
+                                <label className="label">연관 자료</label>
                                 <div style={{ display: 'flex', gap: '8px' }}>
                                     <button type="button" className={`btn ${refType === 'none' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setRefType('none')} style={{ flex: 1 }}>없음</button>
                                     <button type="button" className={`btn ${refType === 'course' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setRefType('course')} style={{ flex: 1 }}>📚 강의</button>
@@ -190,22 +246,50 @@ export default function QuestionsPage() {
                             </div>
 
                             {refType === 'course' && (
-                                <div style={{ marginBottom: '16px' }}>
-                                    <label className="label">강의 선택</label>
-                                    <select className="input" value={courseId} onChange={(e) => setCourseId(e.target.value)} required>
-                                        <option value="">선택하세요</option>
-                                        {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                    </select>
+                                <div style={{ background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+                                    <div style={{ marginBottom: '12px' }}>
+                                        <label className="label">강의 선택 *</label>
+                                        <select className="input" value={courseId} onChange={(e) => setCourseId(e.target.value)} required>
+                                            <option value="">선택하세요</option>
+                                            {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        </select>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                                        <div>
+                                            <label className="label">Lecture No</label>
+                                            <input className="input" type="number" placeholder="1" value={lectureNo} onChange={(e) => setLectureNo(e.target.value)} min="1" />
+                                        </div>
+                                        <div>
+                                            <label className="label">Part No</label>
+                                            <input className="input" type="number" placeholder="1" value={partNo} onChange={(e) => setPartNo(e.target.value)} min="1" />
+                                        </div>
+                                        <div>
+                                            <label className="label">Slide No</label>
+                                            <input className="input" type="number" placeholder="15" value={slideNo} onChange={(e) => setSlideNo(e.target.value)} min="1" />
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
                             {refType === 'textbook' && (
-                                <div style={{ marginBottom: '16px' }}>
-                                    <label className="label">교재 선택</label>
-                                    <select className="input" value={textbookId} onChange={(e) => setTextbookId(e.target.value)} required>
-                                        <option value="">선택하세요</option>
-                                        {textbooks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                    </select>
+                                <div style={{ background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+                                    <div style={{ marginBottom: '12px' }}>
+                                        <label className="label">교재 선택 *</label>
+                                        <select className="input" value={textbookId} onChange={(e) => setTextbookId(e.target.value)} required>
+                                            <option value="">선택하세요</option>
+                                            {textbooks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                        </select>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                        <div>
+                                            <label className="label">챕터</label>
+                                            <input className="input" type="number" placeholder="3" value={chapterNo} onChange={(e) => setChapterNo(e.target.value)} min="1" />
+                                        </div>
+                                        <div>
+                                            <label className="label">페이지</label>
+                                            <input className="input" type="number" placeholder="42" value={pageNo} onChange={(e) => setPageNo(e.target.value)} min="1" />
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 

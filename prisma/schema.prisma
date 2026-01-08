@@ -98,6 +98,13 @@ model QuestionLog {
   userId     String   // Supabase Auth User ID
   courseId   String?
   textbookId String?
+  // 강의 세부정보
+  lectureNo  Int?
+  partNo     Int?
+  slideNo    Int?
+  // 교재 세부정보
+  chapterNo  Int?
+  pageNo     Int?
   content    String
   isResolved Boolean  @default(false)
   createdAt  DateTime @default(now())
