@@ -50,14 +50,25 @@ export default function GoalsPage() {
     // 공통 Form state
     const [goalType, setGoalType] = useState<GoalType>('lecture');
 
-    // 강의 Form state
+    // ===== 월간: 강의 전체 계획 =====
     const [courseId, setCourseId] = useState('');
-    const [lectureStart, setLectureStart] = useState('');
-    const [lectureEnd, setLectureEnd] = useState('');
-    const [partNum, setPartNum] = useState('');
-    const [lectureAction, setLectureAction] = useState<'watch' | 'review'>('watch');
+    const [totalLectures, setTotalLectures] = useState('');  // 전체 강의 수
+    const [monthlyAction, setMonthlyAction] = useState<'complete' | 'partial'>('complete');
+    const [monthlyLectureEnd, setMonthlyLectureEnd] = useState('');  // 부분 완강 시
 
-    // 교재 Form state
+    // ===== 주간: 강의 범위 =====
+    const [weeklyLectureStart, setWeeklyLectureStart] = useState('');
+    const [weeklyLectureEnd, setWeeklyLectureEnd] = useState('');
+    const [weeklyAction, setWeeklyAction] = useState<'watch' | 'review'>('watch');
+
+    // ===== 일간: 개별 강의 =====
+    const [dailyLectureNum, setDailyLectureNum] = useState('');
+    const [hasParts, setHasParts] = useState(false);
+    const [dailyPartNum, setDailyPartNum] = useState('');
+    const [duration, setDuration] = useState('');  // 러닝타임 (분)
+    const [dailyAction, setDailyAction] = useState<'watch' | 'review'>('watch');
+
+    // ===== 교재 (공통) =====
     const [textbookId, setTextbookId] = useState('');
     const [chapterStart, setChapterStart] = useState('');
     const [chapterEnd, setChapterEnd] = useState('');
@@ -65,14 +76,14 @@ export default function GoalsPage() {
     const [pageEnd, setPageEnd] = useState('');
     const [bookAction, setBookAction] = useState<'read' | 'review'>('read');
 
-    // 과제 Form state
+    // ===== 과제 =====
     const [assignmentTitle, setAssignmentTitle] = useState('');
     const [relatedCourseId, setRelatedCourseId] = useState('');
     const [deadlineDate, setDeadlineDate] = useState('');
     const [deadlineTime, setDeadlineTime] = useState('23:59');
     const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
 
-    // 기타 Form state
+    // ===== 기타 =====
     const [otherContent, setOtherContent] = useState('');
 
     useEffect(() => { fetchData(); }, [activeTab, currentDate]);
@@ -109,15 +120,39 @@ export default function GoalsPage() {
     }
 
     function buildGoalTitle(): string {
+        const course = courses.find(c => c.id === courseId);
+        const textbook = textbooks.find(t => t.id === textbookId);
+
         if (goalType === 'lecture') {
-            const course = courses.find(c => c.id === courseId);
-            const actionText = lectureAction === 'watch' ? '시청' : '복습';
-            let lecRange = `Lec ${lectureStart}`;
-            if (lectureEnd && lectureEnd !== lectureStart) lecRange += `~${lectureEnd}`;
-            if (partNum) lecRange += ` Part ${partNum}`;
-            return `${course?.name || ''} ${lecRange} ${actionText}`;
+            if (activeTab === 'MONTH') {
+                // 월간: "알고리즘 완강 (총 25강)" 또는 "알고리즘 Lec 1~15 완료"
+                if (monthlyAction === 'complete') {
+                    return `${course?.name || ''} 완강 (총 ${totalLectures}강)`;
+                } else {
+                    return `${course?.name || ''} Lec 1~${monthlyLectureEnd} 완료`;
+                }
+            } else if (activeTab === 'WEEK') {
+                // 주간: "알고리즘 Lec 5~8 시청"
+                const actionText = weeklyAction === 'watch' ? '시청' : '복습';
+                let range = `Lec ${weeklyLectureStart}`;
+                if (weeklyLectureEnd && weeklyLectureEnd !== weeklyLectureStart) {
+                    range += `~${weeklyLectureEnd}`;
+                }
+                return `${course?.name || ''} ${range} ${actionText}`;
+            } else {
+                // 일간: "알고리즘 Lec 5 Part 2 시청 (30분)"
+                const actionText = dailyAction === 'watch' ? '시청' : '복습';
+                let content = `${course?.name || ''} Lec ${dailyLectureNum}`;
+                if (hasParts && dailyPartNum) {
+                    content += ` Part ${dailyPartNum}`;
+                }
+                content += ` ${actionText}`;
+                if (duration) {
+                    content += ` (${duration}분)`;
+                }
+                return content;
+            }
         } else if (goalType === 'textbook') {
-            const textbook = textbooks.find(t => t.id === textbookId);
             const actionText = bookAction === 'read' ? '읽기' : '복습';
             let range = '';
             if (chapterStart) {
@@ -129,11 +164,11 @@ export default function GoalsPage() {
             }
             return `${textbook?.name || ''} ${range} ${actionText}`.trim();
         } else if (goalType === 'assignment') {
-            const course = courses.find(c => c.id === relatedCourseId);
+            const relatedCourse = courses.find(c => c.id === relatedCourseId);
             const daysLeft = deadlineDate ? Math.ceil((new Date(deadlineDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0;
             const dDay = daysLeft > 0 ? `D-${daysLeft}` : daysLeft === 0 ? 'D-Day' : `D+${Math.abs(daysLeft)}`;
             const priorityEmoji = priority === 'high' ? '🔴' : priority === 'medium' ? '🟡' : '🟢';
-            return `${priorityEmoji} ${assignmentTitle}${course ? ` (${course.name})` : ''} [${dDay}]`;
+            return `${priorityEmoji} ${assignmentTitle}${relatedCourse ? ` (${relatedCourse.name})` : ''} [${dDay}]`;
         }
         return otherContent;
     }
@@ -166,10 +201,17 @@ export default function GoalsPage() {
     function resetForm() {
         setGoalType('lecture');
         setCourseId('');
-        setLectureStart('');
-        setLectureEnd('');
-        setPartNum('');
-        setLectureAction('watch');
+        setTotalLectures('');
+        setMonthlyAction('complete');
+        setMonthlyLectureEnd('');
+        setWeeklyLectureStart('');
+        setWeeklyLectureEnd('');
+        setWeeklyAction('watch');
+        setDailyLectureNum('');
+        setHasParts(false);
+        setDailyPartNum('');
+        setDuration('');
+        setDailyAction('watch');
         setTextbookId('');
         setChapterStart('');
         setChapterEnd('');
@@ -231,6 +273,13 @@ export default function GoalsPage() {
     const statusEmoji = { TODO: '⬜', IN_PROGRESS: '🔄', DONE: '✅' };
     const statusColor = { TODO: 'var(--text-secondary)', IN_PROGRESS: 'var(--warning)', DONE: 'var(--success)' };
 
+    // 강의 폼 유효성 체크
+    const isLectureValid = () => {
+        if (activeTab === 'MONTH') return courseId && totalLectures;
+        if (activeTab === 'WEEK') return courseId && weeklyLectureStart;
+        return courseId && dailyLectureNum;
+    };
+
     return (
         <div>
             <div className="page-header">
@@ -241,78 +290,37 @@ export default function GoalsPage() {
             {/* 탭 */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
                 {(['MONTH', 'WEEK', 'DAY'] as Tab[]).map((tab) => (
-                    <button
-                        key={tab}
-                        className={`btn ${activeTab === tab ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setActiveTab(tab)}
-                    >
+                    <button key={tab} className={`btn ${activeTab === tab ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab(tab)}>
                         {tab === 'MONTH' ? '📅 월간' : tab === 'WEEK' ? '📆 주간' : '📌 일간'}
                     </button>
                 ))}
             </div>
 
             {/* 플래너 카드 */}
-            <div className="card" style={{
-                border: '2px solid var(--border-color)',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                background: 'linear-gradient(to bottom, var(--bg-card), var(--bg-secondary))',
-            }}>
-                {/* 헤더 */}
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '20px',
-                    paddingBottom: '16px',
-                    borderBottom: '1px solid var(--border-color)',
-                }}>
+            <div className="card" style={{ border: '2px solid var(--border-color)', boxShadow: '0 8px 32px rgba(0,0,0,0.3)', background: 'linear-gradient(to bottom, var(--bg-card), var(--bg-secondary))' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
                     <button className="btn btn-secondary btn-sm" onClick={() => navigate(-1)}>← 이전</button>
                     <h2 style={{ fontSize: '1.25rem', fontWeight: '700' }}>{getPeriodTitle()}</h2>
                     <button className="btn btn-secondary btn-sm" onClick={() => navigate(1)}>다음 →</button>
                 </div>
 
-                {/* 목표 리스트 */}
                 {loading ? (
                     <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '40px' }}>로딩 중...</p>
                 ) : goals.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '40px' }}>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>아직 목표가 없습니다</p>
-                    </div>
+                    <div style={{ textAlign: 'center', padding: '40px' }}><p style={{ color: 'var(--text-muted)' }}>아직 목표가 없습니다</p></div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {goals.map((goal) => (
-                            <div
-                                key={goal.id}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '12px',
-                                    padding: '12px 16px',
-                                    background: 'var(--bg-tertiary)',
-                                    borderRadius: '8px',
-                                    borderLeft: `4px solid ${statusColor[goal.status]}`,
-                                }}
-                            >
-                                <span onClick={() => toggleStatus(goal)} style={{ fontSize: '1.25rem', cursor: 'pointer' }}>
-                                    {statusEmoji[goal.status]}
-                                </span>
-                                <span style={{
-                                    flex: 1,
-                                    textDecoration: goal.status === 'DONE' ? 'line-through' : 'none',
-                                    color: goal.status === 'DONE' ? 'var(--text-muted)' : 'inherit',
-                                }}>
-                                    {goal.title}
-                                </span>
+                            <div key={goal.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: `4px solid ${statusColor[goal.status]}` }}>
+                                <span onClick={() => toggleStatus(goal)} style={{ fontSize: '1.25rem', cursor: 'pointer' }}>{statusEmoji[goal.status]}</span>
+                                <span style={{ flex: 1, textDecoration: goal.status === 'DONE' ? 'line-through' : 'none', color: goal.status === 'DONE' ? 'var(--text-muted)' : 'inherit' }}>{goal.title}</span>
                                 <button className="btn btn-danger btn-sm" onClick={() => deleteGoal(goal.id)}>×</button>
                             </div>
                         ))}
                     </div>
                 )}
 
-                {/* 추가 버튼 */}
-                <button className="btn btn-primary" style={{ width: '100%', marginTop: '20px' }} onClick={() => setShowModal(true)}>
-                    + 목표 추가
-                </button>
+                <button className="btn btn-primary" style={{ width: '100%', marginTop: '20px' }} onClick={() => setShowModal(true)}>+ 목표 추가</button>
             </div>
 
             {/* Modal */}
@@ -324,7 +332,7 @@ export default function GoalsPage() {
                             <button className="modal-close" onClick={() => { setShowModal(false); resetForm(); }}>✕</button>
                         </div>
                         <form onSubmit={handleSubmit}>
-                            {/* 목표 유형 선택 */}
+                            {/* 목표 유형 */}
                             <div style={{ marginBottom: '16px' }}>
                                 <label className="label">목표 유형</label>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
@@ -335,7 +343,7 @@ export default function GoalsPage() {
                                 </div>
                             </div>
 
-                            {/* 강의 Form */}
+                            {/* 강의 Form - 기간별로 다름 */}
                             {goalType === 'lecture' && (
                                 <div style={{ background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
                                     <div style={{ marginBottom: '12px' }}>
@@ -345,28 +353,89 @@ export default function GoalsPage() {
                                             {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
                                     </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                                        <div>
-                                            <label className="label">시작 Lec# *</label>
-                                            <input className="input" type="number" placeholder="1" value={lectureStart} onChange={(e) => setLectureStart(e.target.value)} required min="1" />
-                                        </div>
-                                        <div>
-                                            <label className="label">끝 Lec#</label>
-                                            <input className="input" type="number" placeholder="같으면 비워두세요" value={lectureEnd} onChange={(e) => setLectureEnd(e.target.value)} min="1" />
-                                        </div>
-                                        <div>
-                                            <label className="label">Part</label>
-                                            <input className="input" type="number" placeholder="선택" value={partNum} onChange={(e) => setPartNum(e.target.value)} min="1" />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="label">활동</label>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <button type="button" className={`btn btn-sm ${lectureAction === 'watch' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setLectureAction('watch')} style={{ flex: 1 }}>📺 시청</button>
-                                            <button type="button" className={`btn btn-sm ${lectureAction === 'review' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setLectureAction('review')} style={{ flex: 1 }}>🔄 복습</button>
-                                        </div>
-                                    </div>
-                                    {courseId && lectureStart && (
+
+                                    {/* 월간: 전체 강의 수 + 완강/부분 */}
+                                    {activeTab === 'MONTH' && (
+                                        <>
+                                            <div style={{ marginBottom: '12px' }}>
+                                                <label className="label">전체 강의 수 (해당 강의의 총 Lecture 수) *</label>
+                                                <input className="input" type="number" placeholder="예: 25" value={totalLectures} onChange={(e) => setTotalLectures(e.target.value)} required min="1" />
+                                            </div>
+                                            <div style={{ marginBottom: '12px' }}>
+                                                <label className="label">목표</label>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button type="button" className={`btn btn-sm ${monthlyAction === 'complete' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMonthlyAction('complete')} style={{ flex: 1 }}>🎯 완강</button>
+                                                    <button type="button" className={`btn btn-sm ${monthlyAction === 'partial' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMonthlyAction('partial')} style={{ flex: 1 }}>📊 일부</button>
+                                                </div>
+                                            </div>
+                                            {monthlyAction === 'partial' && (
+                                                <div>
+                                                    <label className="label">몇 강까지? (Lec 1 ~ ?)</label>
+                                                    <input className="input" type="number" placeholder="예: 15" value={monthlyLectureEnd} onChange={(e) => setMonthlyLectureEnd(e.target.value)} min="1" max={totalLectures || undefined} required />
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+
+                                    {/* 주간: 범위 선택 */}
+                                    {activeTab === 'WEEK' && (
+                                        <>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                                                <div>
+                                                    <label className="label">시작 Lec# *</label>
+                                                    <input className="input" type="number" placeholder="1" value={weeklyLectureStart} onChange={(e) => setWeeklyLectureStart(e.target.value)} required min="1" />
+                                                </div>
+                                                <div>
+                                                    <label className="label">끝 Lec# (하나면 비워두세요)</label>
+                                                    <input className="input" type="number" placeholder="" value={weeklyLectureEnd} onChange={(e) => setWeeklyLectureEnd(e.target.value)} min="1" />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="label">활동</label>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button type="button" className={`btn btn-sm ${weeklyAction === 'watch' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setWeeklyAction('watch')} style={{ flex: 1 }}>📺 시청</button>
+                                                    <button type="button" className={`btn btn-sm ${weeklyAction === 'review' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setWeeklyAction('review')} style={{ flex: 1 }}>🔄 복습</button>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* 일간: 개별 강의 + 파트 + 러닝타임 */}
+                                    {activeTab === 'DAY' && (
+                                        <>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                                                <div>
+                                                    <label className="label">Lecture 번호 *</label>
+                                                    <input className="input" type="number" placeholder="1" value={dailyLectureNum} onChange={(e) => setDailyLectureNum(e.target.value)} required min="1" />
+                                                </div>
+                                                <div>
+                                                    <label className="label">러닝타임 (분)</label>
+                                                    <input className="input" type="number" placeholder="30" value={duration} onChange={(e) => setDuration(e.target.value)} min="1" />
+                                                </div>
+                                            </div>
+                                            <div style={{ marginBottom: '12px' }}>
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                    <input type="checkbox" checked={hasParts} onChange={(e) => { setHasParts(e.target.checked); if (!e.target.checked) setDailyPartNum(''); }} />
+                                                    <span className="label" style={{ margin: 0 }}>파트가 있음 (Part 구분)</span>
+                                                </label>
+                                            </div>
+                                            {hasParts && (
+                                                <div style={{ marginBottom: '12px' }}>
+                                                    <label className="label">Part 번호</label>
+                                                    <input className="input" type="number" placeholder="1" value={dailyPartNum} onChange={(e) => setDailyPartNum(e.target.value)} min="1" />
+                                                </div>
+                                            )}
+                                            <div>
+                                                <label className="label">활동</label>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button type="button" className={`btn btn-sm ${dailyAction === 'watch' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setDailyAction('watch')} style={{ flex: 1 }}>📺 시청</button>
+                                                    <button type="button" className={`btn btn-sm ${dailyAction === 'review' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setDailyAction('review')} style={{ flex: 1 }}>🔄 복습</button>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {isLectureValid() && (
                                         <div style={{ marginTop: '12px', padding: '10px', background: 'var(--bg-card)', borderRadius: '6px', borderLeft: '3px solid var(--accent-primary)' }}>
                                             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>미리보기: </span>
                                             <strong>{buildGoalTitle()}</strong>
@@ -375,7 +444,7 @@ export default function GoalsPage() {
                                 </div>
                             )}
 
-                            {/* 교재 Form */}
+                            {/* 교재 Form (동일) */}
                             {goalType === 'textbook' && (
                                 <div style={{ background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
                                     <div style={{ marginBottom: '12px' }}>
@@ -386,24 +455,12 @@ export default function GoalsPage() {
                                         </select>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                                        <div>
-                                            <label className="label">시작 챕터</label>
-                                            <input className="input" type="number" placeholder="예: 1" value={chapterStart} onChange={(e) => setChapterStart(e.target.value)} min="1" />
-                                        </div>
-                                        <div>
-                                            <label className="label">끝 챕터</label>
-                                            <input className="input" type="number" placeholder="같으면 비워두세요" value={chapterEnd} onChange={(e) => setChapterEnd(e.target.value)} min="1" />
-                                        </div>
+                                        <div><label className="label">시작 챕터</label><input className="input" type="number" placeholder="1" value={chapterStart} onChange={(e) => setChapterStart(e.target.value)} min="1" /></div>
+                                        <div><label className="label">끝 챕터</label><input className="input" type="number" placeholder="" value={chapterEnd} onChange={(e) => setChapterEnd(e.target.value)} min="1" /></div>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                                        <div>
-                                            <label className="label">시작 페이지</label>
-                                            <input className="input" type="number" placeholder="예: 1" value={pageStart} onChange={(e) => setPageStart(e.target.value)} min="1" />
-                                        </div>
-                                        <div>
-                                            <label className="label">끝 페이지</label>
-                                            <input className="input" type="number" placeholder="예: 50" value={pageEnd} onChange={(e) => setPageEnd(e.target.value)} min="1" />
-                                        </div>
+                                        <div><label className="label">시작 페이지</label><input className="input" type="number" placeholder="1" value={pageStart} onChange={(e) => setPageStart(e.target.value)} min="1" /></div>
+                                        <div><label className="label">끝 페이지</label><input className="input" type="number" placeholder="50" value={pageEnd} onChange={(e) => setPageEnd(e.target.value)} min="1" /></div>
                                     </div>
                                     <div>
                                         <label className="label">활동</label>
@@ -414,8 +471,7 @@ export default function GoalsPage() {
                                     </div>
                                     {textbookId && (chapterStart || pageStart) && (
                                         <div style={{ marginTop: '12px', padding: '10px', background: 'var(--bg-card)', borderRadius: '6px', borderLeft: '3px solid var(--accent-secondary)' }}>
-                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>미리보기: </span>
-                                            <strong>{buildGoalTitle()}</strong>
+                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>미리보기: </span><strong>{buildGoalTitle()}</strong>
                                         </div>
                                     )}
                                 </div>
@@ -424,29 +480,13 @@ export default function GoalsPage() {
                             {/* 과제 Form */}
                             {goalType === 'assignment' && (
                                 <div style={{ background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
-                                    <div style={{ marginBottom: '12px' }}>
-                                        <label className="label">과제명 *</label>
-                                        <input className="input" placeholder="예: HW1 - Policy Gradient 구현" value={assignmentTitle} onChange={(e) => setAssignmentTitle(e.target.value)} required />
-                                    </div>
-                                    <div style={{ marginBottom: '12px' }}>
-                                        <label className="label">관련 강의 (선택)</label>
-                                        <select className="input" value={relatedCourseId} onChange={(e) => setRelatedCourseId(e.target.value)}>
-                                            <option value="">없음</option>
-                                            {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                        </select>
-                                    </div>
+                                    <div style={{ marginBottom: '12px' }}><label className="label">과제명 *</label><input className="input" placeholder="예: HW1 - Policy Gradient 구현" value={assignmentTitle} onChange={(e) => setAssignmentTitle(e.target.value)} required /></div>
+                                    <div style={{ marginBottom: '12px' }}><label className="label">관련 강의 (선택)</label><select className="input" value={relatedCourseId} onChange={(e) => setRelatedCourseId(e.target.value)}><option value="">없음</option>{courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                                        <div>
-                                            <label className="label">마감 일시 *</label>
-                                            <input className="input" type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} required />
-                                        </div>
-                                        <div>
-                                            <label className="label">시간</label>
-                                            <input className="input" type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} />
-                                        </div>
+                                        <div><label className="label">마감 일시 *</label><input className="input" type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} required /></div>
+                                        <div><label className="label">시간</label><input className="input" type="time" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} /></div>
                                     </div>
-                                    <div>
-                                        <label className="label">우선순위</label>
+                                    <div><label className="label">우선순위</label>
                                         <div style={{ display: 'flex', gap: '8px' }}>
                                             <button type="button" className={`btn btn-sm ${priority === 'high' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPriority('high')} style={{ flex: 1 }}>🔴 높음</button>
                                             <button type="button" className={`btn btn-sm ${priority === 'medium' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPriority('medium')} style={{ flex: 1 }}>🟡 보통</button>
@@ -455,19 +495,15 @@ export default function GoalsPage() {
                                     </div>
                                     {assignmentTitle && deadlineDate && (
                                         <div style={{ marginTop: '12px', padding: '10px', background: 'var(--bg-card)', borderRadius: '6px', borderLeft: '3px solid var(--warning)' }}>
-                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>미리보기: </span>
-                                            <strong>{buildGoalTitle()}</strong>
+                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>미리보기: </span><strong>{buildGoalTitle()}</strong>
                                         </div>
                                     )}
                                 </div>
                             )}
 
-                            {/* 기타 Form */}
+                            {/* 기타 */}
                             {goalType === 'other' && (
-                                <div style={{ marginBottom: '16px' }}>
-                                    <label className="label">목표 내용 *</label>
-                                    <textarea className="input" placeholder="자유롭게 입력하세요" value={otherContent} onChange={(e) => setOtherContent(e.target.value)} rows={3} required style={{ resize: 'vertical' }} />
-                                </div>
+                                <div style={{ marginBottom: '16px' }}><label className="label">목표 내용 *</label><textarea className="input" placeholder="자유롭게 입력하세요" value={otherContent} onChange={(e) => setOtherContent(e.target.value)} rows={3} required style={{ resize: 'vertical' }} /></div>
                             )}
 
                             <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>목표 추가</button>
