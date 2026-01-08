@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
 
-// 진도율 계산 헬퍼 함수
-async function calculateProgressRate(assignmentId: string): Promise<number> {
-    const subtasks = await prisma.subtask.findMany({
-        where: { assignmentId },
-    });
-
-    if (subtasks.length === 0) return 0;
-
-    const completedCount = subtasks.filter(s => s.isDone).length;
-    return Math.round((completedCount / subtasks.length) * 100);
-}
-
 // GET: 과제 목록 조회
 export async function GET(request: NextRequest) {
     try {

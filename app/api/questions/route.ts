@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
-import { RefType } from '@prisma/client';
+
+type RefType = 'LECTURE' | 'ASSIGNMENT';
 
 // GET: 질문 로그 목록 조회
 export async function GET(request: NextRequest) {

@@ -1,6 +1,20 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
 
+interface LectureWithDuration {
+    subject: string;
+    lecNum: number;
+    partNum: number | null;
+    duration: number;
+}
+
+interface BookWithPages {
+    title: string;
+    chapterNum: number;
+    pageStart: number;
+    pageEnd: number;
+}
+
 export interface DebtData {
     // 미시청 강의 시간 (분)
     unwatchedLectureMinutes: number;
@@ -73,9 +87,9 @@ export async function GET() {
         });
 
         // 계산
-        const unwatchedLectureMinutes = unwatchedLectures.reduce((sum, l) => sum + l.duration, 0);
-        const unreviewedLectureMinutes = unreviewedLectures.reduce((sum, l) => sum + l.duration, 0);
-        const unreadPages = unreadBooks.reduce((sum, b) => sum + (b.pageEnd - b.pageStart + 1), 0);
+        const unwatchedLectureMinutes = unwatchedLectures.reduce((sum: number, l: LectureWithDuration) => sum + l.duration, 0);
+        const unreviewedLectureMinutes = unreviewedLectures.reduce((sum: number, l: { duration: number }) => sum + l.duration, 0);
+        const unreadPages = unreadBooks.reduce((sum: number, b: BookWithPages) => sum + (b.pageEnd - b.pageStart + 1), 0);
 
         // 부채 점수 계산 (가중치: 마감 지난 과제 = 50점, 임박 = 30점, 강의 1시간 = 10점, 페이지 10개 = 5점, 질문 1개 = 2점)
         const totalDebtScore =
@@ -95,7 +109,7 @@ export async function GET() {
             totalDebtScore: Math.round(totalDebtScore),
             details: {
                 unwatchedLectures,
-                unreadBooks: unreadBooks.map(b => ({
+                unreadBooks: unreadBooks.map((b: BookWithPages) => ({
                     title: b.title,
                     chapterNum: b.chapterNum,
                     pages: b.pageEnd - b.pageStart + 1,
