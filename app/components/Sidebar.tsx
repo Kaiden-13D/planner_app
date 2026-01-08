@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '@/app/lib/supabase-browser';
 
 const navItems = [
     { href: '/', label: '대시보드', icon: '📊' },
@@ -15,6 +16,14 @@ const navItems = [
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const router = useRouter();
+    const supabase = createClient();
+
+    async function handleLogout() {
+        await supabase.auth.signOut();
+        router.push('/auth/login');
+        router.refresh();
+    }
 
     return (
         <nav className="sidebar">
@@ -40,11 +49,22 @@ export default function Sidebar() {
                 marginTop: 'auto',
                 padding: '16px',
                 borderTop: '1px solid var(--border-color)',
-                fontSize: '0.85rem',
-                color: 'var(--text-muted)'
             }}>
-                <p>Knowledge Debt Manager</p>
-                <p style={{ marginTop: '4px' }}>v0.1.0</p>
+                <button
+                    onClick={handleLogout}
+                    className="btn btn-secondary"
+                    style={{ width: '100%', justifyContent: 'center' }}
+                >
+                    🚪 로그아웃
+                </button>
+                <p style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--text-muted)',
+                    textAlign: 'center',
+                    marginTop: '12px'
+                }}>
+                    Knowledge Debt Manager v0.1.0
+                </p>
             </div>
         </nav>
     );
