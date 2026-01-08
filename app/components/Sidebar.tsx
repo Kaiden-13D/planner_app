@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { createClient } from '@/app/lib/supabase-browser';
 
 const navItems = [
@@ -17,6 +18,17 @@ export default function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
     const supabase = createClient();
+    const [nickname, setNickname] = useState('');
+
+    useEffect(() => {
+        async function fetchUser() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user?.user_metadata?.nickname) {
+                setNickname(user.user_metadata.nickname);
+            }
+        }
+        fetchUser();
+    }, []);
 
     async function handleLogout() {
         await supabase.auth.signOut();
@@ -49,6 +61,38 @@ export default function Sidebar() {
                 padding: '16px',
                 borderTop: '1px solid var(--border-color)',
             }}>
+                {/* 사용자 정보 및 설정 */}
+                <Link href="/settings">
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px',
+                        background: 'var(--bg-tertiary)',
+                        borderRadius: '8px',
+                        marginBottom: '12px',
+                        cursor: 'pointer',
+                        border: pathname === '/settings' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                    }}>
+                        <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '50%',
+                            background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1rem',
+                        }}>
+                            {nickname ? nickname.charAt(0).toUpperCase() : '👤'}
+                        </div>
+                        <div>
+                            <p style={{ fontWeight: '600', fontSize: '0.9rem' }}>{nickname || '사용자'}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>⚙️ 계정 설정</p>
+                        </div>
+                    </div>
+                </Link>
+
                 <button
                     onClick={handleLogout}
                     className="btn btn-secondary"
@@ -62,7 +106,7 @@ export default function Sidebar() {
                     textAlign: 'center',
                     marginTop: '12px'
                 }}>
-                    Knowledge Debt Manager v0.2.0
+                    Knowledge Debt Manager v0.3.0
                 </p>
             </div>
         </nav>

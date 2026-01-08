@@ -9,69 +9,57 @@ export default function SignupPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState(false);
+    const [nickname, setNickname] = useState('');
     const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState('');
+    const [error, setError] = useState('');
     const router = useRouter();
     const supabase = createClient();
 
     async function handleSignup(e: React.FormEvent) {
         e.preventDefault();
-        setLoading(true);
-        setError(null);
+        setError('');
+        setMessage('');
 
         if (password !== confirmPassword) {
             setError('비밀번호가 일치하지 않습니다');
-            setLoading(false);
             return;
         }
 
         if (password.length < 6) {
             setError('비밀번호는 6자 이상이어야 합니다');
-            setLoading(false);
             return;
         }
 
-        const { error } = await supabase.auth.signUp({
-            email,
-            password,
-        });
-
-        if (error) {
-            setError(error.message);
-            setLoading(false);
-        } else {
-            setSuccess(true);
+        if (!nickname.trim()) {
+            setError('닉네임을 입력해주세요');
+            return;
         }
-    }
 
-    if (success) {
-        return (
-            <div style={{
-                minHeight: '100vh',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'var(--bg-primary)',
-                padding: '20px',
-            }}>
-                <div className="card" style={{ maxWidth: '400px', width: '100%', textAlign: 'center' }}>
-                    <span style={{ fontSize: '4rem' }}>✉️</span>
-                    <h1 style={{ fontSize: '1.5rem', fontWeight: '700', marginTop: '16px' }}>
-                        이메일을 확인하세요!
-                    </h1>
-                    <p style={{ color: 'var(--text-secondary)', marginTop: '12px' }}>
-                        {email}로 확인 링크를 보냈습니다.<br />
-                        이메일의 링크를 클릭하여 가입을 완료하세요.
-                    </p>
-                    <Link href="/auth/login">
-                        <button className="btn btn-primary" style={{ marginTop: '24px' }}>
-                            로그인 페이지로
-                        </button>
-                    </Link>
-                </div>
-            </div>
-        );
+        setLoading(true);
+
+        try {
+            const { error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        nickname: nickname.trim(),
+                    },
+                    emailRedirectTo: `${window.location.origin}/auth/callback`,
+                },
+            });
+
+            if (error) {
+                setError(error.message);
+            } else {
+                setMessage('가입 확인 이메일을 발송했습니다. 이메일을 확인해주세요!');
+            }
+        } catch {
+            setError('회원가입 중 오류가 발생했습니다');
+        } finally {
+            setLoading(false);
+        }
     }
 
     return (
@@ -80,27 +68,36 @@ export default function SignupPage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'var(--bg-primary)',
+            background: 'linear-gradient(135deg, var(--bg-primary), var(--bg-secondary))',
             padding: '20px',
         }}>
-            <div className="card" style={{ maxWidth: '400px', width: '100%' }}>
-                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+            <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                     <span style={{ fontSize: '3rem' }}>🧠</span>
-                    <h1 style={{ fontSize: '1.5rem', fontWeight: '700', marginTop: '12px' }}>
-                        회원가입
-                    </h1>
-                    <p style={{ color: 'var(--text-secondary)', marginTop: '8px' }}>
-                        지식 부채 관리를 시작하세요
-                    </p>
+                    <h1 style={{ fontSize: '1.5rem', fontWeight: '700', marginTop: '12px' }}>회원가입</h1>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Knowledge Debt Manager</p>
                 </div>
 
                 <form onSubmit={handleSignup}>
+                    <div style={{ marginBottom: '16px' }}>
+                        <label className="label">닉네임</label>
+                        <input
+                            className="input"
+                            type="text"
+                            placeholder="사용할 닉네임"
+                            value={nickname}
+                            onChange={(e) => setNickname(e.target.value)}
+                            required
+                            maxLength={20}
+                        />
+                    </div>
+
                     <div style={{ marginBottom: '16px' }}>
                         <label className="label">이메일</label>
                         <input
                             className="input"
                             type="email"
-                            placeholder="your@email.com"
+                            placeholder="example@email.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
@@ -116,6 +113,7 @@ export default function SignupPage() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
+                            minLength={6}
                         />
                     </div>
 
@@ -132,39 +130,26 @@ export default function SignupPage() {
                     </div>
 
                     {error && (
-                        <div style={{
-                            background: 'var(--danger-soft)',
-                            color: 'var(--danger)',
-                            padding: '12px',
-                            borderRadius: '8px',
-                            marginBottom: '16px',
-                            fontSize: '0.9rem',
-                        }}>
+                        <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--danger)', borderRadius: '8px', color: 'var(--danger)', fontSize: '0.9rem' }}>
                             {error}
                         </div>
                     )}
 
-                    <button
-                        type="submit"
-                        className="btn btn-primary"
-                        style={{ width: '100%' }}
-                        disabled={loading}
-                    >
-                        {loading ? '가입 중...' : '회원가입'}
+                    {message && (
+                        <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid var(--success)', borderRadius: '8px', color: 'var(--success)', fontSize: '0.9rem' }}>
+                            {message}
+                        </div>
+                    )}
+
+                    <button type="submit" className="btn btn-primary" style={{ width: '100%', marginBottom: '16px' }} disabled={loading}>
+                        {loading ? '처리 중...' : '회원가입'}
                     </button>
                 </form>
 
-                <div style={{
-                    marginTop: '24px',
-                    textAlign: 'center',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.9rem',
-                }}>
+                <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                     이미 계정이 있으신가요?{' '}
-                    <Link href="/auth/login" style={{ color: 'var(--accent-primary)' }}>
-                        로그인
-                    </Link>
-                </div>
+                    <Link href="/auth/login" style={{ color: 'var(--accent-primary)' }}>로그인</Link>
+                </p>
             </div>
         </div>
     );
