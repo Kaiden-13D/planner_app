@@ -290,7 +290,7 @@ export default function AssignmentsPage() {
                                 <label className="label">과제명 *</label>
                                 <input
                                     className="input"
-                                    placeholder="예: HW1 - Policy Gradient"
+                                    placeholder="예: 1주차 과제"
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     required
@@ -300,7 +300,7 @@ export default function AssignmentsPage() {
                                 <label className="label">관련 과목</label>
                                 <input
                                     className="input"
-                                    placeholder="예: CS285"
+                                    placeholder="예: 알고리즘"
                                     value={subject}
                                     onChange={(e) => setSubject(e.target.value)}
                                 />
@@ -332,7 +332,7 @@ export default function AssignmentsPage() {
                                 <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                                     <input
                                         className="input"
-                                        placeholder="예: 환경 설정"
+                                        placeholder="예: 문제 1 풀기"
                                         value={subtaskInput}
                                         onChange={(e) => setSubtaskInput(e.target.value)}
                                         onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSubtaskToForm())}

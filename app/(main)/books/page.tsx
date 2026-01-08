@@ -222,7 +222,7 @@ export default function BooksPage() {
                                 <label className="label">도서명 *</label>
                                 <input
                                     className="input"
-                                    placeholder="예: Reinforcement Learning: An Introduction"
+                                    placeholder="예: 클린 코드, 알고리즘 이론"
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     required
@@ -244,7 +244,7 @@ export default function BooksPage() {
                                     <label className="label">챕터 제목</label>
                                     <input
                                         className="input"
-                                        placeholder="예: Introduction"
+                                        placeholder="예: 소개"
                                         value={chapterTitle}
                                         onChange={(e) => setChapterTitle(e.target.value)}
                                     />

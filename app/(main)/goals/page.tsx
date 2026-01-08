@@ -180,7 +180,7 @@ export default function GoalsPage() {
                                 <label className="label">목표 내용 *</label>
                                 <input
                                     className="input"
-                                    placeholder="예: CS285 완강하기"
+                                    placeholder="예: 이번 주 강의 완료하기"
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     required

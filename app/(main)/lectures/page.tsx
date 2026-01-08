@@ -269,7 +269,7 @@ export default function LecturesPage() {
                                 <label className="label">과목명 *</label>
                                 <input
                                     className="input"
-                                    placeholder="예: CS285"
+                                    placeholder="예: 알고리즘, 미적분학"
                                     value={subject}
                                     onChange={(e) => setSubject(e.target.value)}
                                     required
@@ -302,7 +302,7 @@ export default function LecturesPage() {
                                 <label className="label">제목 (선택)</label>
                                 <input
                                     className="input"
-                                    placeholder="예: Introduction to RL"
+                                    placeholder="예: 강의 소개"
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                 />
@@ -339,7 +339,7 @@ export default function LecturesPage() {
                                 <label className="label">과목명 *</label>
                                 <input
                                     className="input"
-                                    placeholder="예: CS285"
+                                    placeholder="예: 알고리즘"
                                     value={batchSubject}
                                     onChange={(e) => setBatchSubject(e.target.value)}
                                     required
